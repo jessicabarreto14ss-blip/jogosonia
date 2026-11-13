@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jornada Neural - Labirinto das Sinapses</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos personalizados para o ambiente neural e animações */
+        :root {
+            --bg-deep: #070918;
+            --neon-cyan: #00f3ff;
+            --neon-magenta: #ff00aa;
+            --neon-green: #00ff88;
+            --neon-purple: #9d4edd;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-deep);
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3, .game-font {
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        /* Efeito de brilho neon */
+        .glow-cyan {
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.4), inset 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+        .glow-magenta {
+            box-shadow: 0 0 15px rgba(255, 0, 170, 0.4), inset 0 0 10px rgba(255, 0, 170, 0.2);
+        }
+        .glow-green {
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4), inset 0 0 10px rgba(0, 255, 136, 0.2);
+        }
+        .text-glow-cyan {
+            text-shadow: 0 0 12px rgba(0, 243, 255, 0.8);
+        }
+        .text-glow-magenta {
+            text-shadow: 0 0 12px rgba(255, 0, 170, 0.8);
+        }
+
+        /* Animação suave de flutuação */
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.03); opacity: 1; }
+        }
+        .animate-pulse-slow {
+            animation: pulseGlow 3s infinite ease-in-out;
+        }
+
+        /* Canvas container */
+        #game-wrapper {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #111638 0%, #060814 100%);
+        }
+
+        canvas {
+            display: block;
+            border-radius: 16px;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.15);
+            touch-action: none;
+        }
+
+        /* Botões D-Pad táteis */
+        .dpad-btn {
+            background: rgba(15, 23, 42, 0.85);
+            border: 2px solid rgba(0, 243, 255, 0.4);
+            color: #00f3ff;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s ease;
+            backdrop-filter: blur(6px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+        .dpad-btn:active, .dpad-btn.active {
+            background: rgba(0, 243, 255, 0.3);
+            border-color: #00f3ff;
+            transform: scale(0.92);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.7);
+        }
+
+        /* Scrollbar personalizada nos modais */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 243, 255, 0.4);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HUD SUPERIOR (Cabeçalho de Status) -->
+    <header id="hud-bar" class="w-full bg-slate-950/90 border-b border-cyan-500/30 px-3 py-2 sm:px-6 sm:py-3 flex flex-wrap items-center justify-between gap-2 z-20 backdrop-blur-md">
+        <!-- Logo e Fase -->
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <svg class="w-6 h-6 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-base sm:text-lg font-bold tracking-wide text-cyan-300 leading-tight">Jornada Neural</h1>
+                <div class="flex items-center gap-2 text-xs">
+                    <span id="hud-level-badge" class="px-2 py-0.5 rounded-full font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                        Fase 1: Fácil
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Métricas Centrais (Fendas, Energia, Pontos) -->
+        <div class="flex items-center gap-3 sm:gap-6">
+            <!-- Fendas Desbloqueadas -->
+            <div class="flex flex-col items-center">
+                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Fendas</span>
+                <div class="flex items-center gap-1 text-sm sm:text-base font-bold text-fuchsia-400">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/></svg>
+                    <span id="hud-synapses">0 / 2</span>
+                </div>
+            </div>
+
+            <!-- Barra de Energia (Potencial de Ação) -->
+            <div class="flex flex-col items-start w-24 sm:w-32">
+                <div class="flex justify-between w-full text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
+                    <span>Energia (mV)</span>
+                    <span id="hud-energy-text" class="text-cyan-300">100%</span>
+                </div>
+                <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                    <div id="hud-energy-bar" class="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- Pontuação -->
+            <div class="flex flex-col items-center">
+                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Pontos</span>
+                <span id="hud-score" class="text-sm sm:text-base font-bold text-amber-300">0</span>
+            </div>
+        </div>
+
+        <!-- Botões de Ação Rápida -->
+        <div class="flex items-center gap-1.5 sm:gap-2">
+            <button id="btn-sound" title="Alternar Som" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-cyan-300 transition">
+                <svg id="icon-sound-on" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                </svg>
+                <svg id="icon-sound-off" class="w-4 h-4 sm:w-5 sm:h-5 hidden text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+                </svg>
+            </button>
+            <button id="btn-help" title="Instruções" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-cyan-300 transition">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </button>
+            <button id="btn-restart" title="Reiniciar Fase" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-fuchsia-300 transition">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- ÁREA PRINCIPAL DO JOGO (CANVAS + CONTROLES FLUTUANTES) -->
+    <main id="game-wrapper">
+        <canvas id="neuralCanvas"></canvas>
+
+        <!-- Notificação Flutuante (Toast / Mensagem Rápida) -->
+        <div id="toast-banner" class="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-2xl bg-slate-900/90 border border-cyan-400/50 text-cyan-200 text-xs sm:text-sm font-medium shadow-xl opacity-0 transition-opacity duration-300 z-10 text-center max-w-[90%]">
+            Navegue até a Fenda Sináptica brilhante!
+        </div>
+
+        <!-- Legenda Visual no Canto Superior Esquerdo -->
+        <div class="hidden md:flex flex-col gap-1.5 absolute top-4 left-4 bg-slate-950/75 border border-slate-800 p-3 rounded-2xl backdrop-blur-sm text-xs pointer-events-none">
+            <div class="font-semibold text-slate-300 mb-0.5">Legenda Neural</div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f3ff]"></span>
+                <span class="text-slate-300">Impulso Nervoso (Você)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-fuchsia-500 shadow-[0_0_8px_#ff00aa]"></span>
+                <span class="text-slate-300">Fenda Sináptica (Desafio)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_8px_#00ff88]"></span>
+                <span class="text-slate-300">Sinapse Ativada / Destino</span>
+            </div>
+        </div>
+
+        <!-- Controles Direcionais na Tela (Mobile & Mouse) -->
+        <div id="onscreen-controls" class="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 grid grid-cols-3 gap-1.5 w-36 h-36 sm:w-40 sm:h-40 z-10 opacity-90 hover:opacity-100 transition-opacity">
+            <div></div>
+            <button id="btn-up" aria-label="Mover para cima" class="dpad-btn">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+            </button>
+            <div></div>
+            <button id="btn-left" aria-label="Mover para esquerda" class="dpad-btn">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <div class="flex items-center justify-center">
+                <div class="w-3 h-3 rounded-full bg-cyan-500/40"></div>
+            </div>
+            <button id="btn-right" aria-label="Mover para direita" class="dpad-btn">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <div></div>
+            <button id="btn-down" aria-label="Mover para baixo" class="dpad-btn">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div></div>
+        </div>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: TELA INICIAL / INSTRUÇÕES                                    -->
+    <!-- ===================================================================== -->
+    <div id="start-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-cyan-500/40 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl glow-cyan max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-center mb-4">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 animate-pulse-slow">
+                    <svg class="w-9 h-9 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-fuchsia-400 mb-2">
+                Jornada Neural
+            </h2>
+            <p class="text-center text-cyan-200/80 text-sm sm:text-base font-medium mb-5">
+                O Labirinto das Sinapses
+            </p>
+
+            <div class="space-y-3 text-sm text-slate-300 bg-slate-950/60 p-4 rounded-2xl border border-slate-800 mb-6">
+                <div class="flex items-start gap-3">
+                    <span class="px-2 py-0.5 rounded-lg bg-cyan-500/20 text-cyan-300 font-bold text-xs mt-0.5">1</span>
+                    <p><strong class="text-white">Conduza o Impulso Nervoso:</strong> Use as <strong class="text-cyan-300">setas do teclado</strong> (ou os botões na tela) para viajar pelos axônios e caminhos neurais.</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="px-2 py-0.5 rounded-lg bg-fuchsia-500/20 text-fuchsia-300 font-bold text-xs mt-0.5">2</span>
+                    <p><strong class="text-white">Atravesse Fendas Sinápticas:</strong> Ao encontrar uma barreira sináptica brilhante, responda ao desafio de <strong class="text-fuchsia-300">Biologia</strong> para liberar neurotransmissores e abrir passagem.</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold text-xs mt-0.5">3</span>
+                    <p><strong class="text-white">Evolua em 3 Níveis:</strong> Supere as fases <span class="text-emerald-400 font-semibold">Fácil</span>, <span class="text-amber-400 font-semibold">Médio</span> e <span class="text-rose-400 font-semibold">Difícil</span> para ativar o córtex cerebral!</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button id="btn-start-game" class="flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-base sm:text-lg shadow-lg shadow-cyan-500/30 transition transform hover:-translate-y-0.5 active:translate-y-0">
+                    Iniciar Jornada Neural
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: DESAFIO DA FENDA SINÁPTICA (QUIZ DE BIOLOGIA)                -->
+    <!-- ===================================================================== -->
+    <div id="quiz-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-40 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-fuchsia-500/60 rounded-3xl max-w-xl w-full p-5 sm:p-7 shadow-2xl glow-magenta max-h-[92vh] overflow-y-auto">
+            <!-- Cabeçalho da Fenda -->
+            <div class="flex items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-fuchsia-500/20 border border-fuchsia-500/50 flex items-center justify-center text-fuchsia-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-fuchsia-400">Fenda Sináptica Detectada</span>
+                        <h3 id="quiz-topic" class="text-sm sm:text-base font-bold text-white">Transmissão Química</h3>
+                    </div>
+                </div>
+                <span id="quiz-difficulty-pill" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-cyan-300 border border-slate-700">
+                    Nível Fácil
+                </span>
+            </div>
+
+            <!-- Pergunta -->
+            <p id="quiz-question" class="text-base sm:text-lg font-semibold text-slate-100 leading-snug mb-5">
+                Carregando pergunta de biologia...
+            </p>
+
+            <!-- Opções de Resposta -->
+            <div id="quiz-options" class="space-y-2.5 mb-5">
+                <!-- Botões inseridos via JS -->
+            </div>
+
+            <!-- Área de Feedback Educativo -->
+            <div id="quiz-feedback" class="hidden p-4 rounded-2xl border mb-4 text-sm leading-relaxed">
+                <div id="quiz-feedback-title" class="font-bold text-base mb-1"></div>
+                <p id="quiz-feedback-text" class="text-slate-200"></p>
+            </div>
+
+            <!-- Botão de Continuar / Tentar Novamente -->
+            <div id="quiz-actions" class="hidden flex justify-end">
+                <button id="btn-quiz-continue" class="w-full sm:w-auto py-3 px-6 rounded-2xl font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition shadow-lg">
+                    Liberar Neurotransmissores
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: TRANSIÇÃO DE FASE / VITÓRIA FINAL / GAME OVER                -->
+    <!-- ===================================================================== -->
+    <div id="status-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-emerald-500/50 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl glow-green max-h-[92vh] overflow-y-auto text-center">
+            <div id="status-icon" class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400">
+                <svg class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+
+            <h2 id="status-title" class="text-2xl sm:text-3xl font-bold text-white mb-2">
+                Fase Concluída!
+            </h2>
+            <p id="status-subtitle" class="text-slate-300 text-sm sm:text-base mb-5">
+                O potencial de ação atingiu o terminal axônico com sucesso!
+            </p>
+
+            <!-- Resumo de Estatísticas -->
+            <div class="grid grid-cols-3 gap-2 sm:gap-3 bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800 mb-5">
+                <div>
+                    <div class="text-[11px] text-slate-400 uppercase">Pontuação</div>
+                    <div id="status-score" class="text-lg sm:text-xl font-bold text-amber-300">0</div>
+                </div>
+                <div>
+                    <div class="text-[11px] text-slate-400 uppercase">Energia</div>
+                    <div id="status-energy" class="text-lg sm:text-xl font-bold text-cyan-300">100%</div>
+                </div>
+                <div>
+                    <div class="text-[11px] text-slate-400 uppercase">Acertos</div>
+                    <div id="status-accuracy" class="text-lg sm:text-xl font-bold text-emerald-400">100%</div>
+                </div>
+            </div>
+
+            <!-- Revisão dos Conceitos Aprendidos na Fase -->
+            <div id="status-concepts-box" class="text-left bg-slate-950/60 border border-slate-800 rounded-2xl p-4 mb-6">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2">
+                    Conceitos de Biologia Consolidados:
+                </h4>
+                <ul id="status-concepts-list" class="space-y-2 text-xs sm:text-sm text-slate-300 list-disc pl-4">
+                    <!-- Inserido dinamicamente -->
+                </ul>
+            </div>
+
+            <button id="btn-status-next" class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 text-slate-950 font-bold text-base sm:text-lg shadow-lg transition">
+                Avançar para Próxima Fase
+            </button>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- SCRIPT DO JOGO (MOTOR CANVAS, LABIRINTO, QUIZ DE BIOLOGIA E ÁUDIO)    -->
+    <!-- ===================================================================== -->
+    <script>
+        /**
+         * BANCO DE QUESTÕES DE BIOLOGIA POR NÍVEL DE DIFICULDADE
+         * Focado em Sistema Nervoso, Sinapses, Neurônios, Neurotransmissores e Fisiologia.
+         */
+        const BIOLOGY_QUESTIONS = {
+            facil: [
+                {
+                    topic: "Estrutura do Neurônio",
+                    question: "Qual estrutura do neurônio é especializada em receber estímulos de outros neurônios ou do ambiente e conduzi-los em direção ao corpo celular?",
+                    options: [
+                        "Dendritos",
+                        "Bainha de mielina",
+                        "Terminais axônicos",
+                        "Núcleo celular"
+                    ],
+                    correct: 0,
+                    explanation: "Os dendritos são ramificações curtas e numerosas que funcionam como 'antenas', captando sinais químicos de outros neurônios e levando-os ao corpo celular.",
+                    concept: "Dendritos recebem estímulos nervosos; o axônio conduz o impulso para longe do corpo celular."
+                },
+                {
+                    topic: "Conceito de Sinapse",
+                    question: "O que é a fenda sináptica observada durante a comunicação entre dois neurônios?",
+                    options: [
+                        "O núcleo onde fica o DNA do neurônio",
+                        "O espaço microscópico entre um neurônio pré-sináptico e uma célula pós-sináptica",
+                        "Uma camada de gordura que envolve o músculo",
+                        "O osso que protege a medula espinhal"
+                    ],
+                    correct: 1,
+                    explanation: "Na sinapse química, os neurônios não se tocam fisicamente: existe um pequeno espaço chamado fenda sináptica, onde são liberados neurotransmissores.",
+                    concept: "Fenda sináptica é o espaço entre neurônios atravessado por mensageiros químicos (neurotransmissores)."
+                },
+                {
+                    topic: "Condução do Impulso",
+                    question: "Qual é o sentido normal de propagação do impulso nervoso dentro de um único neurônio?",
+                    options: [
+                        "Axônio → Corpo Celular → Dendritos",
+                        "Corpo Celular → Dendritos → Axônio",
+                        "Dendritos → Corpo Celular → Axônio",
+                        "Terminais Axônicos → Dendritos → Núcleo"
+                    ],
+                    correct: 2,
+                    explanation: "O impulso nervoso segue uma direção unidirecional: entra pelos dendritos, passa pelo corpo celular (soma) e percorre todo o axônio até suas extremidades.",
+                    concept: "O fluxo do impulso nervoso segue sempre a ordem: Dendritos → Corpo Celular → Axônio."
+                },
+                {
+                    topic: "Divisão do Sistema Nervoso",
+                    question: "Quais órgãos compõem o Sistema Nervoso Central (SNC) humano?",
+                    options: [
+                        "Nervos cranianos e nervos raquidianos",
+                        "Encéfalo e medula espinhal",
+                        "Apenas o cérebro e o coração",
+                        "Gânglios nervosos e terminações sensoriais"
+                    ],
+                    correct: 1,
+                    explanation: "O Sistema Nervoso Central (SNC) é protegido por estruturas ósseas (crânio e coluna vertebral) e é formado pelo encéfalo e pela medula espinhal.",
+                    concept: "O Sistema Nervoso Central (SNC) é constituído pelo encéfalo e pela medula espinhal."
+                }
+            ],
+            medio: [
+                {
+                    topic: "Bainha de Mielina",
+                    question: "Qual é a principal função da bainha de mielina que envolve muitos axônios no sistema nervoso?",
+                    options: [
+                        "Produzir glicose para alimentar o cérebro",
+                        "Atuar como isolante elétrico, aumentando a velocidade de condução do impulso nervoso",
+                        "Impedir a passagem de qualquer impulso elétrico",
+                        "Destruir neurotransmissores após a sinapse"
+                    ],
+                    correct: 1,
+                    explanation: "A bainha de mielina (formada por células de Schwann no SNP e oligodendrócitos no SNC) isola o axônio e permite a condução saltatória nos nódulos de Ranvier.",
+                    concept: "A bainha de mielina acelera o impulso nervoso por meio da condução saltatória entre os nódulos de Ranvier."
+                },
+                {
+                    topic: "Neurotransmissores",
+                    question: "Qual neurotransmissor está diretamente ligado à contração dos músculos esqueléticos na junção neuromuscular e também à memória?",
+                    options: [
+                        "Acetilcolina",
+                        "Melatonina",
+                        "Insulina",
+                        "Adrenalina pancreática"
+                    ],
+                    correct: 0,
+                    explanation: "A acetilcolina (ACh) é liberada pelos neurônios motores sobre as fibras musculares, desencadeando a contração muscular, além de atuar na atenção e memória.",
+                    concept: "A acetilcolina é o neurotransmissor fundamental da junção neuromuscular e da memória."
+                },
+                {
+                    topic: "Neurotransmissores e Bem-Estar",
+                    question: "A dopamina e a serotonina são neurotransmissores fundamentais no encéfalo. Eles estão principalmente associados a:",
+                    options: [
+                        "Digestão de proteínas no estômago",
+                        "Sistema de recompensa, motivação, regulação do humor e sono",
+                        "Transporte de oxigênio nas hemácias",
+                        "Filtração do sangue nos néfrons"
+                    ],
+                    correct: 1,
+                    explanation: "A dopamina atua nos circuitos de recompensa, prazer e controle motor, enquanto a serotonina regula o humor, o bem-estar, o apetite e o ciclo do sono.",
+                    concept: "Dopamina (recompensa e movimento) e Serotonina (humor e sono) são neurotransmissores essenciais do SNC."
+                },
+                {
+                    topic: "Vesículas Sinápticas",
+                    question: "Quando o impulso nervoso chega ao terminal axônico, qual íon entra na célula e estimula a exocitose das vesículas com neurotransmissores?",
+                    options: [
+                        "Íon Ferro (Fe²⁺)",
+                        "Íon Cálcio (Ca²⁺)",
+                        "Íon Iodo (I⁻)",
+                        "Íon Magnésio (Mg²⁺)"
+                    ],
+                    correct: 1,
+                    explanation: "A chegada da despolarização abre canais de Cálcio (Ca²⁺) dependentes de voltagem. O influxo de Ca²⁺ faz as vesículas sinápticas se fundirem à membrana e liberarem neurotransmissores.",
+                    concept: "A entrada de íons Cálcio (Ca²⁺) no terminal pré-sináptico dispara a liberação de neurotransmissores."
+                }
+            ],
+            dificil: [
+                {
+                    topic: "Potencial de Ação: Despolarização",
+                    question: "Durante a fase de despolarização do potencial de ação de um neurônio, o que ocorre na membrana plasmática do axônio?",
+                    options: [
+                        "Abertura rápida de canais de Sódio (Na⁺), com grande entrada de Na⁺ tornando o interior celular positivo",
+                        "Saída maciça de íons Cloreto (Cl⁻) para fora do neurônio",
+                        "Paralisação total da bomba de sódio e potássio por 24 horas",
+                        "Entrada de proteínas grandes através da bicamada lipídica"
+                    ],
+                    correct: 0,
+                    explanation: "Ao atingir o limiar de excitação (~ -55 mV), canais de Na⁺ dependentes de voltagem se abrem. O influxo rápido de Na⁺ inverte a polaridade da membrana (chegando a +30 mV).",
+                    concept: "Despolarização ocorre pelo rápido influxo de íons Sódio (Na⁺) através de canais dependentes de voltagem."
+                },
+                {
+                    topic: "Repolarização e Bomba de Na⁺/K⁺",
+                    question: "Logo após o pico do potencial de ação, como o neurônio inicia a repolarização e posteriormente restabelece o potencial de repouso?",
+                    options: [
+                        "Entrada de Cálcio seguida de digestão da membrana",
+                        "Saída de íons Potássio (K⁺) para repolarizar e ação da Bomba de Na⁺/K⁺ (com gasto de ATP) para restaurar os gradientes",
+                        "Absorção de oxigênio puro pelo axônio",
+                        "Fechamento permanente de todos os canais iônicos"
+                    ],
+                    correct: 1,
+                    explanation: "Canais de K⁺ se abrem permitindo a saída de K⁺ (repolarização). Em seguida, a Bomba de Sódio e Potássio bombeia 3 Na⁺ para fora e 2 K⁺ para dentro usando ATP.",
+                    concept: "A repolarização depende da saída de K⁺, e o equilíbrio iônico original é mantido pela Bomba de Na⁺/K⁺ (transporte ativo)."
+                },
+                {
+                    topic: "Sinapses Elétricas vs. Químicas",
+                    question: "Qual característica diferencia uma sinapse elétrica de uma sinapse química?",
+                    options: [
+                        "A sinapse elétrica usa neurotransmissores lentos e não possui junções comunicantes",
+                        "Na sinapse elétrica, íons passam diretamente entre células vizinhas através de junções comunicantes (gap junctions), sendo ultrarrápida",
+                        "A sinapse elétrica só existe nas plantas superiores",
+                        "A sinapse química ocorre sem necessidade de membrana plasmática"
+                    ],
+                    correct: 1,
+                    explanation: "Sinapses elétricas conectam o citoplasma de células adjacentes por junções comunicantes (conexons), permitindo transmissão quase instantânea e bidirecional.",
+                    concept: "Sinapses elétricas usam junções comunicantes (gap junctions) para passagem direta de corrente iônica."
+                },
+                {
+                    topic: "Sistema Nervoso Autônomo",
+                    question: "Em uma situação de perigo agudo ('luta ou fuga'), a divisão Simpática do Sistema Nervoso Autônomo promove:",
+                    options: [
+                        "Diminuição dos batimentos cardíacos e aumento da digestão",
+                        "Taquicardia, dilatação das pupilas (midríase), broncodilatação e liberação de adrenalina/noradrenalina",
+                        "Contração das pupilas e redução da glicemia",
+                        "Indução imediata ao sono profundo"
+                    ],
+                    correct: 1,
+                    explanation: "O Sistema Nervoso Simpático prepara o organismo para emergências usando noradrenalina e adrenalina, elevando a frequência cardíaca e o fluxo sanguíneo muscular.",
+                    concept: "O SN Simpático coordena respostas de 'luta ou fuga' (taquicardia, midríase, broncodilatação)."
+                },
+                {
+                    topic: "Neurotransmissores Inibitórios",
+                    question: "Qual é o principal neurotransmissor inibitório do Sistema Nervoso Central que hiperpolariza o neurônio pós-sináptico ao abrir canais de Cloreto (Cl⁻)?",
+                    options: [
+                        "Glutamato",
+                        "GABA (Ácido Gama-Aminobutírico)",
+                        "Adrenalina",
+                        "Histamina"
+                    ],
+                    correct: 1,
+                    explanation: "O GABA é o principal neurotransmissor inibitório do encéfalo. Ao se ligar a receptores GABA-A, permite a entrada de Cl⁻, tornando o interior mais negativo (hiperpolarização).",
+                    concept: "O GABA é o principal neurotransmissor inibitório do SNC, reduzindo a excitabilidade neuronal."
+                }
+            ]
+        };
+
+        /**
+         * CONFIGURAÇÃO DAS 3 FASES DO JOGO
+         */
+        const LEVELS_CONFIG = [
+            {
+                id: 1,
+                key: 'facil',
+                name: 'Fase 1: Fácil',
+                subtitle: 'Introdução aos Neurônios & Sinapses',
+                cols: 11,
+                rows: 9,
+                synapseCount: 2,
+                badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+                wallColor: '#00f3ff',
+                wallGlow: 'rgba(0, 243, 255, 0.45)'
+            },
+            {
+                id: 2,
+                key: 'medio',
+                name: 'Fase 2: Médio',
+                subtitle: 'Bainha de Mielina & Neurotransmissores',
+                cols: 15,
+                rows: 11,
+                synapseCount: 3,
+                badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+                wallColor: '#c084fc',
+                wallGlow: 'rgba(192, 132, 252, 0.45)'
+            },
+            {
+                id: 3,
+                key: 'dificil',
+                name: 'Fase 3: Difícil',
+                subtitle: 'Potencial de Ação & Fisiologia Neural',
+                cols: 19,
+                rows: 13,
+                synapseCount: 4,
+                badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+                wallColor: '#ff00aa',
+                wallGlow: 'rgba(255, 0, 170, 0.45)'
+            }
+        ];
+
+        /**
+         * SISTEMA DE ÁUDIO PROCEDURAL (Web Audio API - Sem URLs externas)
+         */
+        class NeuralAudio {
+            constructor() {
+                this.enabled = true;
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTone(freq, type = 'sine', duration = 0.15, vol = 0.12, slideTo = null) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    if (slideTo) {
+                        osc.frequency.exponentialRampToValueAtTime(slideTo, this.ctx.currentTime + duration);
+                    }
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {
+                    // Ignora falhas silenciosas de áudio em navegadores restritivos
+                }
+            }
+
+            playStep() {
+                this.playTone(320, 'sine', 0.06, 0.04, 480);
+            }
+
+            playSynapseTrigger() {
+                this.playTone(440, 'triangle', 0.25, 0.12, 660);
+            }
+
+            playCorrect() {
+                this.playTone(523.25, 'sine', 0.15, 0.14); // Dó
+                setTimeout(() => this.playTone(659.25, 'sine', 0.15, 0.14), 100); // Mi
+                setTimeout(() => this.playTone(783.99, 'sine', 0.25, 0.16), 200); // Sol
+            }
+
+            playWrong() {
+                this.playTone(220, 'sawtooth', 0.25, 0.1, 140);
+            }
+
+            playLevelUp() {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((n, idx) => {
+                    setTimeout(() => this.playTone(n, 'triangle', 0.22, 0.15), idx * 110);
+                });
+            }
+        }
+
+        const audio = new NeuralAudio();
+
+        /**
+         * ESTADO GLOBAL DO JOGO
+         */
+        const gameState = {
+            currentLevelIndex: 0,
+            score: 0,
+            energy: 100,
+            totalQuestionsAnswered: 0,
+            correctAnswersCount: 0,
+            learnedConcepts: [],
+            isPaused: true,
+            isQuizOpen: false,
+            grid: [], // 0 = caminho, 1 = parede orgânica
+            cols: 11,
+            rows: 9,
+            player: {
+                gx: 1,
+                gy: 1,
+                px: 1, // posição visual interpolada
+                py: 1,
+                trail: []
+            },
+            goal: { gx: 9, gy: 7 },
+            synapses: [], // { id, gx, gy, unlocked, question, animProgress, particles }
+            activeSynapse: null,
+            ambientParticles: [],
+            burstParticles: [],
+            time: 0
+        };
+
+        /**
+         * REFERÊNCIAS DO DOM
+         */
+        const canvas = document.getElementById('neuralCanvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('game-wrapper');
+
+        const hudLevelBadge = document.getElementById('hud-level-badge');
+        const hudSynapses = document.getElementById('hud-synapses');
+        const hudEnergyText = document.getElementById('hud-energy-text');
+        const hudEnergyBar = document.getElementById('hud-energy-bar');
+        const hudScore = document.getElementById('hud-score');
+        const toastBanner = document.getElementById('toast-banner');
+
+        const startModal = document.getElementById('start-modal');
+        const quizModal = document.getElementById('quiz-modal');
+        const statusModal = document.getElementById('status-modal');
+
+        /**
+         * EXIBE MENSAGEM FLUTUANTE TEMPORÁRIA (Substitui qualquer alert)
+         */
+        let toastTimeout = null;
+        function showToast(msg, duration = 2800) {
+            toastBanner.textContent = msg;
+            toastBanner.classList.remove('opacity-0');
+            toastBanner.classList.add('opacity-100');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastBanner.classList.remove('opacity-100');
+                toastBanner.classList.add('opacity-0');
+            }, duration);
+        }
+
+        /**
+         * GERADOR DE LABIRINTO ORGÂNICO COM CAMINHO GARANTIDO E FENDAS SINÁPTICAS
+         */
+        function generateNeuralMaze(cols, rows, synapseCount, difficultyKey) {
+            // Inicializa matriz toda preenchida com paredes (1)
+            const grid = Array.from({ length: rows }, () => Array(cols).fill(1));
+
+            // Recursive Backtracker para cavar caminhos neurais
+            function carve(x, y) {
+                grid[y][x] = 0;
+                const dirs = [
+                    [0, -2], [2, 0], [0, 2], [-2, 0]
+                ].sort(() => Math.random() - 0.5);
+
+                for (const [dx, dy] of dirs) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx > 0 && nx < cols - 1 && ny > 0 && ny < rows - 1 && grid[ny][nx] === 1) {
+                        grid[y + dy / 2][x + dx / 2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+
+            carve(1, 1);
+
+            // Adiciona algumas conexões extras (loops dendríticos) para dar fluidez orgânica
+            const extraLoops = Math.floor((cols * rows) / 35);
+            for (let i = 0; i < extraLoops; i++) {
+                const rx = 2 + Math.floor(Math.random() * (cols - 4));
+                const ry = 2 + Math.floor(Math.random() * (rows - 4));
+                if (grid[ry][rx] === 1) {
+                    const openNeighbors = [
+                        grid[ry - 1][rx] === 0,
+                        grid[ry + 1][rx] === 0,
+                        grid[ry][rx - 1] === 0,
+                        grid[ry][rx + 1] === 0
+                    ].filter(Boolean).length;
+                    if (openNeighbors === 2) {
+                        grid[ry][rx] = 0;
+                    }
+                }
+            }
+
+            const start = { gx: 1, gy: 1 };
+            const goal = { gx: cols - 2, gy: rows - 2 };
+            grid[goal.gy][goal.gx] = 0;
+
+            // Encontra o caminho mais curto (BFS) entre início e fim para posicionar fendas sinápticas em pontos estratégicos
+            const shortestPath = findShortestPath(grid, start, goal);
+
+            // Seleciona perguntas únicas para esta fase
+            const pool = [...BIOLOGY_QUESTIONS[difficultyKey]].sort(() => Math.random() - 0.5);
+            const synapses = [];
+
+            if (shortestPath.length > synapseCount + 2) {
+                const step = Math.floor(shortestPath.length / (synapseCount + 1));
+                for (let i = 1; i <= synapseCount; i++) {
+                    const pathIdx = Math.min(i * step, shortestPath.length - 2);
+                    const cell = shortestPath[pathIdx];
+                    // Evita duplicar coordenada
+                    if (!synapses.some(s => s.gx === cell.gx && s.gy === cell.gy)) {
+                        synapses.push({
+                            id: i,
+                            gx: cell.gx,
+                            gy: cell.gy,
+                            unlocked: false,
+                            question: pool[(i - 1) % pool.length],
+                            animProgress: 0,
+                            neurotransmitters: Array.from({ length: 10 }, () => ({
+                                offset: Math.random() * Math.PI * 2,
+                                speed: 0.03 + Math.random() * 0.03
+                            }))
+                        });
+                    }
+                }
+            }
+
+            return { grid, start, goal, synapses };
+        }
+
+        /**
+         * BUSCA EM LARGURA (BFS) PARA GARANTIR ROTA VÁLIDA NO LABIRINTO
+         */
+        function findShortestPath(grid, start, goal) {
+            const rows = grid.length;
+            const cols = grid[0].length;
+            const queue = [[start]];
+            const visited = new Set([`${start.gx},${start.gy}`]);
+
+            while (queue.length > 0) {
+                const path = queue.shift();
+                const curr = path[path.length - 1];
+
+                if (curr.gx === goal.gx && curr.gy === goal.gy) {
+                    return path;
+                }
+
+                const neighbors = [
+                    { gx: curr.gx + 1, gy: curr.gy },
+                    { gx: curr.gx - 1, gy: curr.gy },
+                    { gx: curr.gx, gy: curr.gy + 1 },
+                    { gx: curr.gx, gy: curr.gy - 1 }
+                ];
+
+                for (const next of neighbors) {
+                    const key = `${next.gx},${next.gy}`;
+                    if (
+                        next.gx >= 0 && next.gx < cols &&
+                        next.gy >= 0 && next.gy < rows &&
+                        grid[next.gy][next.gx] === 0 &&
+                        !visited.has(key)
+                    ) {
+                        visited.add(key);
+                        queue.push([...path, next]);
+                    }
+                }
+            }
+            return [start, goal];
+        }
+
+        /**
+         * INICIALIZA OU REINICIA UMA FASE ESPECÍFICA
+         */
+        function loadLevel(levelIndex, resetAllStats = false) {
+            if (resetAllStats) {
+                gameState.score = 0;
+                gameState.energy = 100;
+                gameState.totalQuestionsAnswered = 0;
+                gameState.correctAnswersCount = 0;
+                gameState.learnedConcepts = [];
+            } else {
+                // Recupera um pouco de energia ao avançar de fase
+                gameState.energy = Math.min(100, gameState.energy + 25);
+            }
+
+            gameState.currentLevelIndex = levelIndex;
+            const config = LEVELS_CONFIG[levelIndex];
+            gameState.cols = config.cols;
+            gameState.rows = config.rows;
+
+            const mazeData = generateNeuralMaze(config.cols, config.rows, config.synapseCount, config.key);
+            gameState.grid = mazeData.grid;
+            gameState.goal = mazeData.goal;
+            gameState.synapses = mazeData.synapses;
+
+            gameState.player = {
+                gx: mazeData.start.gx,
+                gy: mazeData.start.gy,
+                px: mazeData.start.gx,
+                py: mazeData.start.gy,
+                trail: []
+            };
+
+            gameState.activeSynapse = null;
+            gameState.isQuizOpen = false;
+            gameState.burstParticles = [];
+
+            // Partículas ambientais flutuantes (íons e vesículas no fluido extracelular)
+            gameState.ambientParticles = Array.from({ length: 45 }, () => ({
+                x: Math.random(),
+                y: Math.random(),
+                r: 1.5 + Math.random() * 2.5,
+                vx: (Math.random() - 0.5) * 0.0006,
+                vy: (Math.random() - 0.5) * 0.0006,
+                alpha: 0.2 + Math.random() * 0.5,
+                color: Math.random() > 0.5 ? '#00f3ff' : '#ff00aa'
+            }));
+
+            updateHUD();
+            resizeCanvas();
+            showToast(`${config.name}: ${config.subtitle}`, 3200);
+        }
+
+        /**
+         * ATUALIZA ELEMENTOS DO HUD SUPERIOR
+         */
+        function updateHUD() {
+            const config = LEVELS_CONFIG[gameState.currentLevelIndex];
+            hudLevelBadge.textContent = config.name;
+            hudLevelBadge.className = `px-2 py-0.5 rounded-full font-semibold border ${config.badgeClass}`;
+
+            const unlockedCount = gameState.synapses.filter(s => s.unlocked).length;
+            hudSynapses.textContent = `${unlockedCount} / ${gameState.synapses.length}`;
+
+            const clampedEnergy = Math.max(0, Math.min(100, Math.round(gameState.energy)));
+            hudEnergyText.textContent = `${clampedEnergy}%`;
+            hudEnergyBar.style.width = `${clampedEnergy}%`;
+
+            if (clampedEnergy > 50) {
+                hudEnergyBar.className = 'h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300';
+            } else if (clampedEnergy > 25) {
+                hudEnergyBar.className = 'h-full bg-gradient-to-r from-amber-400 to-yellow-300 transition-all duration-300';
+            } else {
+                hudEnergyBar.className = 'h-full bg-gradient-to-r from-rose-500 to-orange-500 transition-all duration-300';
+            }
+
+            hudScore.textContent = gameState.score;
+        }
+
+        /**
+         * MOVIMENTAÇÃO DO IMPULSO NERVOSO
+         */
+        function movePlayer(dx, dy) {
+            if (gameState.isPaused || gameState.isQuizOpen) return;
+
+            const nx = gameState.player.gx + dx;
+            const ny = gameState.player.gy + dy;
+
+            // Verifica limites e paredes orgânicas
+            if (
+                nx < 0 || nx >= gameState.cols ||
+                ny < 0 || ny >= gameState.rows ||
+                gameState.grid[ny][nx] === 1
+            ) {
+                return;
+            }
+
+            // Verifica se há uma fenda sináptica bloqueada na célula destino
+            const synapse = gameState.synapses.find(s => s.gx === nx && s.gy === ny);
+            if (synapse && !synapse.unlocked) {
+                // Encosta na fenda e abre o desafio de biologia
+                audio.playSynapseTrigger();
+                openSynapseQuiz(synapse);
+                return;
+            }
+
+            // Realiza o movimento
+            gameState.player.gx = nx;
+            gameState.player.gy = ny;
+            audio.playStep();
+
+            // Verifica se alcançou o terminal axônico (objetivo da fase)
+            if (nx === gameState.goal.gx && ny === gameState.goal.gy) {
+                const lockedRemaining = gameState.synapses.filter(s => !s.unlocked).length;
+                if (lockedRemaining > 0) {
+                    showToast(`Ainda falta desbloquear ${lockedRemaining} fenda(s) sináptica(s)!`, 2600);
+                } else {
+                    handleLevelComplete();
+                }
+            }
+        }
+
+        /**
+         * ABRE O MODAL DE DESAFIO DA FENDA SINÁPTICA
+         */
+        function openSynapseQuiz(synapse) {
+            gameState.isQuizOpen = true;
+            gameState.activeSynapse = synapse;
+
+            const config = LEVELS_CONFIG[gameState.currentLevelIndex];
+            const q = synapse.question;
+
+            document.getElementById('quiz-topic').textContent = q.topic;
+            document.getElementById('quiz-difficulty-pill').textContent = config.name;
+            document.getElementById('quiz-question').textContent = q.question;
+
+            const optionsContainer = document.getElementById('quiz-options');
+            optionsContainer.innerHTML = '';
+
+            const feedbackBox = document.getElementById('quiz-feedback');
+            const actionsBox = document.getElementById('quiz-actions');
+            feedbackBox.classList.add('hidden');
+            actionsBox.classList.add('hidden');
+
+            const letters = ['A', 'B', 'C', 'D'];
+
+            q.options.forEach((optText, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full text-left p-3.5 rounded-2xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700 hover:border-cyan-400/60 transition flex items-start gap-3 group';
+                btn.innerHTML = `
+                    <span class="w-7 h-7 rounded-xl bg-slate-900 border border-slate-700 group-hover:border-cyan-400 text-cyan-300 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                        ${letters[index]}
+                    </span>
+                    <span class="text-sm sm:text-base text-slate-200 group-hover:text-white leading-snug">${optText}</span>
+                `;
+                btn.addEventListener('click', () => handleQuizAnswer(index, btn));
+                optionsContainer.appendChild(btn);
+            });
+
+            quizModal.classList.remove('hidden');
+            quizModal.classList.add('flex');
+        }
+
+        /**
+         * PROCESSA A RESPOSTA DO JOGADOR NO DESAFIO DE BIOLOGIA
+         */
+        function handleQuizAnswer(selectedIndex, clickedBtn) {
+            const synapse = gameState.activeSynapse;
+            if (!synapse) return;
+
+            const q = synapse.question;
+            const isCorrect = selectedIndex === q.correct;
+            const allButtons = document.querySelectorAll('#quiz-options button');
+
+            gameState.totalQuestionsAnswered++;
+
+            // Desabilita todos os botões após escolha
+            allButtons.forEach((b, idx) => {
+                b.disabled = true;
+                b.classList.remove('hover:bg-slate-800', 'hover:border-cyan-400/60');
+                if (idx === q.correct) {
+                    b.classList.add('bg-emerald-950/80', 'border-emerald-400', 'text-emerald-200');
+                } else if (idx === selectedIndex && !isCorrect) {
+                    b.classList.add('bg-rose-950/80', 'border-rose-500', 'text-rose-200');
+                } else {
+                    b.classList.add('opacity-50');
+                }
+            });
+
+            const feedbackBox = document.getElementById('quiz-feedback');
+            const feedbackTitle = document.getElementById('quiz-feedback-title');
+            const feedbackText = document.getElementById('quiz-feedback-text');
+            const actionsBox = document.getElementById('quiz-actions');
+            const continueBtn = document.getElementById('btn-quiz-continue');
+
+            feedbackBox.classList.remove('hidden');
+            actionsBox.classList.remove('hidden');
+
+            if (isCorrect) {
+                audio.playCorrect();
+                gameState.correctAnswersCount++;
+                gameState.score += 150 + (gameState.currentLevelIndex * 50);
+                gameState.energy = Math.min(100, gameState.energy + 10);
+
+                if (!gameState.learnedConcepts.includes(q.concept)) {
+                    gameState.learnedConcepts.push(q.concept);
+                }
+
+                feedbackBox.className = 'p-4 rounded-2xl border border-emerald-500/50 bg-emerald-950/40 mb-4 text-sm leading-relaxed';
+                feedbackTitle.className = 'font-bold text-base mb-1 text-emerald-300';
+                feedbackTitle.textContent = '✓ Transmissão Sináptica Bem-Sucedida!';
+                feedbackText.textContent = q.explanation;
+
+                continueBtn.textContent = 'Liberar Neurotransmissores & Avançar';
+                continueBtn.className = 'w-full sm:w-auto py-3 px-6 rounded-2xl font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition shadow-lg';
+                continueBtn.onclick = () => {
+                    closeQuizAndUnlockSynapse(true);
+                };
+            } else {
+                audio.playWrong();
+                gameState.energy = Math.max(0, gameState.energy - 20);
+
+                feedbackBox.className = 'p-4 rounded-2xl border border-rose-500/50 bg-rose-950/40 mb-4 text-sm leading-relaxed';
+                feedbackTitle.className = 'font-bold text-base mb-1 text-rose-300';
+                feedbackTitle.textContent = '✕ Falha na Despolarização (-20% Energia)';
+                feedbackText.textContent = q.explanation;
+
+                if (gameState.energy <= 0) {
+                    continueBtn.textContent = 'Ver Resultado';
+                    continueBtn.className = 'w-full sm:w-auto py-3 px-6 rounded-2xl font-bold text-white bg-rose-600 hover:bg-rose-500 transition shadow-lg';
+                    continueBtn.onclick = () => {
+                        quizModal.classList.add('hidden');
+                        quizModal.classList.remove('flex');
+                        gameState.isQuizOpen = false;
+                        handleGameOver();
+                    };
+                } else {
+                    // Troca a pergunta da fenda para o jogador tentar novamente com uma nova questão
+                    continueBtn.textContent = 'Tentar Nova Questão na Fenda';
+                    continueBtn.className = 'w-full sm:w-auto py-3 px-6 rounded-2xl font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 transition shadow-lg';
+                    continueBtn.onclick = () => {
+                        const config = LEVELS_CONFIG[gameState.currentLevelIndex];
+                        const pool = BIOLOGY_QUESTIONS[config.key];
+                        const alternatives = pool.filter(item => item.question !== synapse.question.question);
+                        if (alternatives.length > 0) {
+                            synapse.question = alternatives[Math.floor(Math.random() * alternatives.length)];
+                        }
+                        openSynapseQuiz(synapse);
+                    };
+                }
+            }
+
+            updateHUD();
+        }
+
+        /**
+         * DESBLOQUEIA A FENDA SINÁPTICA E DISPARA ANIMAÇÃO DE NEUROTRANSMISSORES
+         */
+        function closeQuizAndUnlockSynapse(moveOntoCell) {
+            const synapse = gameState.activeSynapse;
+            quizModal.classList.add('hidden');
+            quizModal.classList.remove('flex');
+            gameState.isQuizOpen = false;
+
+            if (synapse) {
+                synapse.unlocked = true;
+                synapse.animProgress = 0.01;
+
+                // Gera explosão visual de neurotransmissores verdes/dourados
+                spawnBurst(synapse.gx + 0.5, synapse.gy + 0.5, '#00ff88', 28);
+
+                if (moveOntoCell) {
+                    gameState.player.gx = synapse.gx;
+                    gameState.player.gy = synapse.gy;
+                }
+            }
+
+            updateHUD();
+            showToast('Neurotransmissores liberados! Caminho desbloqueado.', 2400);
+        }
+
+        /**
+         * GERA PARTÍCULAS DE EXPLOSÃO NO CANVAS
+         */
+        function spawnBurst(gx, gy, color, count = 20) {
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+                const speed = 0.03 + Math.random() * 0.08;
+                gameState.burstParticles.push({
+                    x: gx,
+                    y: gy,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1.0,
+                    color
+                });
+            }
+        }
+
+        /**
+         * CONCLUSÃO DE FASE OU VITÓRIA FINAL DO JOGO
+         */
+        function handleLevelComplete() {
+            gameState.isPaused = true;
+            audio.playLevelUp();
+
+            const isFinalLevel = gameState.currentLevelIndex >= LEVELS_CONFIG.length - 1;
+            const accuracy = gameState.totalQuestionsAnswered > 0
+                ? Math.round((gameState.correctAnswersCount / gameState.totalQuestionsAnswered) * 100)
+                : 100;
+
+            document.getElementById('status-score').textContent = gameState.score;
+            document.getElementById('status-energy').textContent = `${Math.round(gameState.energy)}%`;
+            document.getElementById('status-accuracy').textContent = `${accuracy}%`;
+
+            const conceptsList = document.getElementById('status-concepts-list');
+            conceptsList.innerHTML = '';
+            const itemsToShow = gameState.learnedConcepts.slice(-4);
+            itemsToShow.forEach(concept => {
+                const li = document.createElement('li');
+                li.textContent = concept;
+                conceptsList.appendChild(li);
+            });
+
+            const statusIcon = document.getElementById('status-icon');
+            const statusTitle = document.getElementById('status-title');
+            const statusSubtitle = document.getElementById('status-subtitle');
+            const nextBtn = document.getElementById('btn-status-next');
+
+            statusIcon.className = 'w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400';
+
+            if (isFinalLevel) {
+                statusTitle.textContent = 'Jornada Neural Concluída!';
+                statusSubtitle.textContent = 'Parabéns! Você dominou as sinapses desde os dendritos básicos até o potencial de ação completo!';
+                nextBtn.textContent = 'Jogar Novamente desde o Início';
+                nextBtn.onclick = () => {
+                    statusModal.classList.add('hidden');
+                    statusModal.classList.remove('flex');
+                    gameState.isPaused = false;
+                    loadLevel(0, true);
+                };
+            } else {
+                const nextConfig = LEVELS_CONFIG[gameState.currentLevelIndex + 1];
+                statusTitle.textContent = `${LEVELS_CONFIG[gameState.currentLevelIndex].name} Superada!`;
+                statusSubtitle.textContent = `Prepare-se para ${nextConfig.name} (${nextConfig.subtitle}).`;
+                nextBtn.textContent = `Iniciar ${nextConfig.name}`;
+                nextBtn.onclick = () => {
+                    statusModal.classList.add('hidden');
+                    statusModal.classList.remove('flex');
+                    gameState.isPaused = false;
+                    loadLevel(gameState.currentLevelIndex + 1, false);
+                };
+            }
+
+            statusModal.classList.remove('hidden');
+            statusModal.classList.add('flex');
+        }
+
+        /**
+         * GAME OVER POR PERDA TOTAL DE ENERGIA DO IMPULSO
+         */
+        function handleGameOver() {
+            gameState.isPaused = true;
+            const accuracy = gameState.totalQuestionsAnswered > 0
+                ? Math.round((gameState.correctAnswersCount / gameState.totalQuestionsAnswered) * 100)
+                : 0;
+
+            document.getElementById('status-icon').className = 'w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-500/20 border border-rose-400 flex items-center justify-center text-rose-400';
+            document.getElementById('status-title').textContent = 'Potencial de Ação Dissipado';
+            document.getElementById('status-subtitle').textContent = 'A energia do impulso nervoso chegou a 0%. Revise os conceitos e tente novamente!';
+            document.getElementById('status-score').textContent = gameState.score;
+            document.getElementById('status-energy').textContent = '0%';
+            document.getElementById('status-accuracy').textContent = `${accuracy}%`;
+
+            const conceptsList = document.getElementById('status-concepts-list');
+            conceptsList.innerHTML = '<li>Dica: Leia atentamente o enunciado sobre os íons e neurotransmissores antes de escolher a alternativa.</li>';
+
+            const nextBtn = document.getElementById('btn-status-next');
+            nextBtn.textContent = 'Tentar Fase Novamente';
+            nextBtn.onclick = () => {
+                statusModal.classList.add('hidden');
+                statusModal.classList.remove('flex');
+                gameState.energy = 100;
+                gameState.isPaused = false;
+                loadLevel(gameState.currentLevelIndex, false);
+            };
+
+            statusModal.classList.remove('hidden');
+            statusModal.classList.add('flex');
+        }
+
+        /**
+         * REDIMENSIONAMENTO RESPONSIVO DO CANVAS
+         */
+        function resizeCanvas() {
+            const rect = wrapper.getBoundingClientRect();
+            const padding = window.innerWidth < 640 ? 16 : 36;
+            const availW = Math.max(260, rect.width - padding);
+            const availH = Math.max(240, rect.height - padding);
+
+            const cellW = Math.floor(availW / gameState.cols);
+            const cellH = Math.floor(availH / gameState.rows);
+            const cellSize = Math.max(18, Math.min(cellW, cellH));
+
+            canvas.width = cellSize * gameState.cols;
+            canvas.height = cellSize * gameState.rows;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        /**
+         * RENDERIZAÇÃO EM CANVAS 2D (ESTÉTICA ORGÂNICA & NEUROCIÊNCIA)
+         */
+        function renderGame() {
+            gameState.time += 0.04;
+            const cw = canvas.width;
+            const ch = canvas.height;
+            const cellSize = cw / gameState.cols;
+            const config = LEVELS_CONFIG[gameState.currentLevelIndex] || LEVELS_CONFIG[0];
+
+            // Fundo profundo do fluido neural
+            ctx.fillStyle = '#070b1e';
+            ctx.fillRect(0, 0, cw, ch);
+
+            // 1. Partículas ambientais flutuantes
+            for (const p of gameState.ambientParticles) {
+                p.x = (p.x + p.vx + 1) % 1;
+                p.y = (p.y + p.vy + 1) % 1;
+                ctx.beginPath();
+                ctx.arc(p.x * cw, p.y * ch, p.r, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.alpha * (0.6 + 0.4 * Math.sin(gameState.time + p.x * 10));
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+
+            // 2. Desenho das Paredes Orgânicas (Membranas Axônicas) e Caminhos
+            for (let r = 0; r < gameState.rows; r++) {
+                for (let c = 0; c < gameState.cols; c++) {
+                    const x = c * cellSize;
+                    const y = r * cellSize;
+
+                    if (gameState.grid[r][c] === 1) {
+                        // Célula de parede membranosa
+                        ctx.fillStyle = '#111936';
+                        ctx.fillRect(x, y, cellSize, cellSize);
+
+                        // Borda orgânica luminosa nas faces voltadas para corredores
+                        ctx.strokeStyle = config.wallColor;
+                        ctx.lineWidth = Math.max(1.5, cellSize * 0.06);
+                        ctx.globalAlpha = 0.45 + 0.15 * Math.sin(gameState.time * 1.5 + (r + c) * 0.5);
+
+                        const pad = 1.5;
+                        ctx.strokeRect(x + pad, y + pad, cellSize - pad * 2, cellSize - pad * 2);
+                        ctx.globalAlpha = 1;
+                    } else {
+                        // Corredor neural sutil
+                        ctx.fillStyle = 'rgba(14, 22, 52, 0.45)';
+                        ctx.fillRect(x, y, cellSize, cellSize);
+                    }
+                }
+            }
+
+            // 3. Desenho do Objetivo Final (Terminal Axônico / Córtex Alvo)
+            const goalX = (gameState.goal.gx + 0.5) * cellSize;
+            const goalY = (gameState.goal.gy + 0.5) * cellSize;
+            const goalPulse = 1 + 0.15 * Math.sin(gameState.time * 3);
+
+            const goalGrad = ctx.createRadialGradient(goalX, goalY, cellSize * 0.05, goalX, goalY, cellSize * 0.48 * goalPulse);
+            goalGrad.addColorStop(0, '#ffffff');
+            goalGrad.addColorStop(0.35, '#00ff88');
+            goalGrad.addColorStop(1, 'rgba(0, 255, 136, 0)');
+            ctx.fillStyle = goalGrad;
+            ctx.beginPath();
+            ctx.arc(goalX, goalY, cellSize * 0.48 * goalPulse, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Anel rotativo no objetivo
+            ctx.save();
+            ctx.translate(goalX, goalY);
+            ctx.rotate(gameState.time * 0.8);
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.arc(0, 0, cellSize * 0.34, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+
+            // 4. Desenho das Fendas Sinápticas
+            for (const syn of gameState.synapses) {
+                const sx = (syn.gx + 0.5) * cellSize;
+                const sy = (syn.gy + 0.5) * cellSize;
+
+                if (!syn.unlocked) {
+                    // Fenda Bloqueada: Terminais pré e pós-sinápticos pulsando em magenta
+                    const pulse = 1 + 0.12 * Math.sin(gameState.time * 4 + syn.id);
+
+                    const synGrad = ctx.createRadialGradient(sx, sy, 2, sx, sy, cellSize * 0.48 * pulse);
+                    synGrad.addColorStop(0, '#ff80d5');
+                    synGrad.addColorStop(0.5, 'rgba(255, 0, 170, 0.55)');
+                    synGrad.addColorStop(1, 'rgba(255, 0, 170, 0)');
+                    ctx.fillStyle = synGrad;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, cellSize * 0.48 * pulse, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Desenha os dois bulbos sinápticos (pré e pós) com vesículas
+                    ctx.fillStyle = '#ff00aa';
+                    ctx.beginPath();
+                    ctx.arc(sx - cellSize * 0.18, sy, cellSize * 0.14, 0, Math.PI * 2);
+                    ctx.arc(sx + cellSize * 0.18, sy, cellSize * 0.14, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Vesículas dançando na fenda
+                    for (let i = 0; i < 4; i++) {
+                        const vy = sy + Math.sin(gameState.time * 5 + i * 1.5) * (cellSize * 0.22);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath();
+                        ctx.arc(sx, vy, Math.max(1.8, cellSize * 0.045), 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    // Fenda Desbloqueada: Ponte verde luminosa com neurotransmissores atravessando
+                    if (syn.animProgress < 1) {
+                        syn.animProgress = Math.min(1, syn.animProgress + 0.025);
+                    }
+
+                    ctx.strokeStyle = 'rgba(0, 255, 136, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, cellSize * 0.3, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Neurotransmissores atravessando continuamente
+                    syn.neurotransmitters.forEach((nt, idx) => {
+                        const progress = ((gameState.time * 0.8 + idx * 0.1) % 1);
+                        const nx = sx - cellSize * 0.25 + progress * (cellSize * 0.5);
+                        const ny = sy + Math.sin(progress * Math.PI * 2 + nt.offset) * (cellSize * 0.14);
+                        ctx.fillStyle = '#00ff88';
+                        ctx.beginPath();
+                        ctx.arc(nx, ny, Math.max(1.5, cellSize * 0.04), 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                }
+            }
+
+            // 5. Interpolação suave da posição do Jogador (Impulso Nervoso)
+            gameState.player.px += (gameState.player.gx - gameState.player.px) * 0.32;
+            gameState.player.py += (gameState.player.gy - gameState.player.py) * 0.32;
+
+            const playerX = (gameState.player.px + 0.5) * cellSize;
+            const playerY = (gameState.player.py + 0.5) * cellSize;
+
+            // Atualiza rastro elétrico do impulso
+            gameState.player.trail.push({ x: playerX, y: playerY });
+            if (gameState.player.trail.length > 14) {
+                gameState.player.trail.shift();
+            }
+
+            // Desenha rastro luminoso
+            if (gameState.player.trail.length > 1) {
+                for (let i = 0; i < gameState.player.trail.length - 1; i++) {
+                    const pt = gameState.player.trail[i];
+                    const ratio = (i + 1) / gameState.player.trail.length;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, cellSize * 0.24 * ratio, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(0, 243, 255, ${ratio * 0.45})`;
+                    ctx.fill();
+                }
+            }
+
+            // Desenha esfera principal do Potencial de Ação
+            const pGrad = ctx.createRadialGradient(playerX, playerY, 1, playerX, playerY, cellSize * 0.42);
+            pGrad.addColorStop(0, '#ffffff');
+            pGrad.addColorStop(0.4, '#00f3ff');
+            pGrad.addColorStop(1, 'rgba(0, 243, 255, 0)');
+            ctx.fillStyle = pGrad;
+            ctx.beginPath();
+            ctx.arc(playerX, playerY, cellSize * 0.42, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Núcleo brilhante
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(playerX, playerY, cellSize * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 6. Partículas de explosão (ao desbloquear fendas)
+            for (let i = gameState.burstParticles.length - 1; i >= 0; i--) {
+                const bp = gameState.burstParticles[i];
+                bp.x += bp.vx;
+                bp.y += bp.vy;
+                bp.life -= 0.025;
+                if (bp.life <= 0) {
+                    gameState.burstParticles.splice(i, 1);
+                } else {
+                    ctx.globalAlpha = bp.life;
+                    ctx.fillStyle = bp.color;
+                    ctx.beginPath();
+                    ctx.arc(bp.x * cellSize, bp.y * cellSize, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.globalAlpha = 1;
+
+            requestAnimationFrame(renderGame);
+        }
+
+        /**
+         * CONTROLES DE TECLADO (SETAS E WASD)
+         */
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    highlightDpad('btn-up');
+                    movePlayer(0, -1);
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    highlightDpad('btn-down');
+                    movePlayer(0, 1);
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    highlightDpad('btn-left');
+                    movePlayer(-1, 0);
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    highlightDpad('btn-right');
+                    movePlayer(1, 0);
+                    break;
+            }
+        });
+
+        function highlightDpad(btnId) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            btn.classList.add('active');
+            setTimeout(() => btn.classList.remove('active'), 130);
+        }
+
+        /**
+         * EVENTOS DOS BOTÕES DIRECIONAIS NA TELA (MOUSE E TOQUE)
+         */
+        function bindDirectionButton(id, dx, dy) {
+            const btn = document.getElementById(id);
+            const trigger = (e) => {
+                e.preventDefault();
+                movePlayer(dx, dy);
+            };
+            btn.addEventListener('touchstart', trigger, { passive: false });
+            btn.addEventListener('mousedown', trigger);
+        }
+
+        bindDirectionButton('btn-up', 0, -1);
+        bindDirectionButton('btn-down', 0, 1);
+        bindDirectionButton('btn-left', -1, 0);
+        bindDirectionButton('btn-right', 1, 0);
+
+        /**
+         * SUPORTE A GESTOS DE SWIPE NO CANVAS PARA DISPOSITIVOS MÓVEIS
+         */
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (e.changedTouches.length > 0) {
+                const dx = e.changedTouches[0].clientX - touchStartX;
+                const dy = e.changedTouches[0].clientY - touchStartY;
+                if (Math.abs(dx) > 22 || Math.abs(dy) > 22) {
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        movePlayer(dx > 0 ? 1 : -1, 0);
+                    } else {
+                        movePlayer(0, dy > 0 ? 1 : -1);
+                    }
+                }
+            }
+        }, { passive: true });
+
+        /**
+         * EVENTOS DOS BOTÕES DE INTERFACE (INICIAR, SOM, AJUDA, REINICIAR)
+         */
+        document.getElementById('btn-start-game').addEventListener('click', () => {
+            audio.init();
+            startModal.classList.add('hidden');
+            gameState.isPaused = false;
+            if (gameState.grid.length === 0) {
+                loadLevel(0, true);
+            }
+        });
+
+        document.getElementById('btn-help').addEventListener('click', () => {
+            gameState.isPaused = true;
+            document.getElementById('btn-start-game').textContent = 'Continuar Jornada';
+            startModal.classList.remove('hidden');
+        });
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            if (gameState.isQuizOpen) return;
+            gameState.energy = 100;
+            loadLevel(gameState.currentLevelIndex, false);
+            showToast('Fase reiniciada!', 1800);
+        });
+
+        document.getElementById('btn-sound').addEventListener('click', () => {
+            audio.enabled = !audio.enabled;
+            document.getElementById('icon-sound-on').classList.toggle('hidden', !audio.enabled);
+            document.getElementById('icon-sound-off').classList.toggle('hidden', audio.enabled);
+        });
+
+        /**
+         * INICIALIZAÇÃO APÓS CARREGAMENTO DA JANELA
+         */
+        window.onload = function () {
+            loadLevel(0, true);
+            gameState.isPaused = true; // Aguarda clique em 'Iniciar Jornada Neural'
+            requestAnimationFrame(renderGame);
+        };
+    </script>
+</body>
+</html>
